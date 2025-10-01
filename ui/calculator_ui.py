@@ -10,6 +10,7 @@ from kivy.uix.button import Button
 from kivy.uix.textinput import TextInput
 from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
+from kivy.uix.togglebutton import ToggleButton
 from core.calculator_core import CalculatorCore
 
 class CalculatorWidget(BoxLayout):
@@ -23,6 +24,10 @@ class CalculatorWidget(BoxLayout):
         
         # Initialize core calculation module
         self.core = CalculatorCore()
+        
+        # Create mode display
+        self.mode_display = self._create_mode_display()
+        self.add_widget(self.mode_display)
         
         # Create history display area
         self.history_display = self._create_history_display()
@@ -39,11 +44,40 @@ class CalculatorWidget(BoxLayout):
         for row in buttons:
             h_layout = BoxLayout(spacing=10)
             for label in row:
-                button = Button(text=label, font_size=40)
-                button.bind(on_press=self.on_button_press)
+                if label == 'DEG/RAD':
+                    # Create toggle button for angle mode
+                    button = ToggleButton(text=f'DEG', font_size=20)
+                    button.bind(on_press=self._toggle_angle_mode)
+                    button.state = 'down' if self.core.get_angle_mode() == 'deg' else 'normal'
+                else:
+                    button = Button(text=label, font_size=30)
+                    button.bind(on_press=self.on_button_press)
                 h_layout.add_widget(button)
             self.add_widget(h_layout)
             
+    def _create_mode_display(self):
+        """Create mode display area"""
+        mode_layout = BoxLayout(orientation="horizontal", size_hint_y=None, height=30)
+        
+        # Angle mode display
+        self.angle_mode_label = Label(
+            text=f"Angle: {self.core.get_angle_mode().upper()}",
+            font_size=16,
+            color=(0.5, 0.5, 0.8, 1)
+        )
+        
+        # Memory display
+        self.memory_label = Label(
+            text="Memory: 0",
+            font_size=16,
+            color=(0.8, 0.5, 0.5, 1)
+        )
+        
+        mode_layout.add_widget(self.angle_mode_label)
+        mode_layout.add_widget(self.memory_label)
+        
+        return mode_layout
+    
     def _create_display(self):
         """
         Create display screen
@@ -107,17 +141,20 @@ class CalculatorWidget(BoxLayout):
     
     def _create_buttons(self):
         """
-        Create button layout
+        Create button layout with scientific functions
         
         Returns:
             list: Button layout list
         """
         return [
-            ['C', '+/-', '%', '/'],
-            ['7', '8', '9', '*'],
-            ['4', '5', '6', '-'],
-            ['1', '2', '3', '+'],
-            ['0', '.', '=', '=']
+            ['C', '+/-', '%', '/', 'sin', 'cos'],
+            ['7', '8', '9', '*', 'tan', 'cot'],
+            ['4', '5', '6', '-', 'asin', 'acos'],
+            ['1', '2', '3', '+', 'atan', 'log'],
+            ['0', '.', '=', 'π', 'ln', 'e'],
+            ['x²', 'x³', 'xⁿ', '√', '³√', '!'],
+            ['(', ')', '|x|', 'MR', 'M+', 'M-'],
+            ['MC', 'MS', 'DEG/RAD', 'DEL', 'CE', 'ANS']
         ]
             
     def on_button_press(self, instance):
@@ -133,6 +170,12 @@ class CalculatorWidget(BoxLayout):
         if button_text == 'C':
             # Clear screen
             self.solution.text = ""
+        elif button_text == 'CE':
+            # Clear entry (clear current input)
+            self.solution.text = ""
+        elif button_text == 'DEL':
+            # Backspace
+            self.solution.text = current[:-1]
         elif button_text == '=':
             # Calculate result and display
             result = self.core.evaluate_expression(current)
@@ -140,10 +183,57 @@ class CalculatorWidget(BoxLayout):
             
             # Update history display
             self._update_history_display()
+        elif button_text == 'ANS':
+            # Insert last answer
+            if self.core.last_result:
+                self.solution.text = current + self.core.last_result
+        elif button_text == 'MR':
+            # Memory recall
+            memory_value = self.core.memory_recall()
+            self.solution.text = current + memory_value
+        elif button_text == 'MS':
+            # Memory store
+            if current:
+                self.core.memory_store(current)
+                self._update_memory_display()
+        elif button_text == 'M+':
+            # Memory add
+            if current:
+                self.core.memory_add(current)
+                self._update_memory_display()
+        elif button_text == 'M-':
+            # Memory subtract
+            if current:
+                self.core.memory_subtract(current)
+                self._update_memory_display()
+        elif button_text == 'MC':
+            # Memory clear
+            self.core.memory_clear()
+            self._update_memory_display()
         else:
             # Add button text to current expression
             if self.core.validate_input(current, button_text):
-                self.solution.text = current + button_text
+                # Handle special cases for functions that need parentheses
+                if button_text in ['sin', 'cos', 'tan', 'cot', 'asin', 'acos', 'atan', 'log', 'ln', '√', '³√']:
+                    self.solution.text = current + button_text + '('
+                elif button_text == '|x|':
+                    self.solution.text = current + '|'
+                elif button_text == 'xⁿ':
+                    self.solution.text = current + '^'
+                else:
+                    self.solution.text = current + button_text
+    
+    def _toggle_angle_mode(self, instance):
+        """Toggle between degree and radian mode"""
+        current_mode = self.core.get_angle_mode()
+        new_mode = 'rad' if current_mode == 'deg' else 'deg'
+        self.core.set_angle_mode(new_mode)
+        instance.text = new_mode.upper()
+        self.angle_mode_label.text = f"Angle: {new_mode.upper()}"
+    
+    def _update_memory_display(self):
+        """Update memory display"""
+        self.memory_label.text = f"Memory: {self.core.memory}"
     
     def _update_history_display(self):
         """Update history display"""
