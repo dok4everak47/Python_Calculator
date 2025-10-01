@@ -1,6 +1,6 @@
 """
-SciCalc Pro - 科学计算器
-模块化主程序入口
+SciCalc Pro - Scientific Calculator
+Modular Main Program Entry
 """
 
 from kivy.app import App
